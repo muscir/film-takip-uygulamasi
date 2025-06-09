@@ -1,0 +1,239 @@
+<!-- Film Takip Uygulaması - GÜNCELLENMİŞ -->
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Film Takip Uygulaması</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #0d0d0d;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+    }
+    input, button, select {
+      padding: 10px;
+      font-size: 18px;
+      width: 80%;
+      margin: 10px 0;
+      border-radius: 10px;
+      border: none;
+    }
+    button {
+      background-color: #ff9900;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .movie {
+      margin-top: 20px;
+    }
+    img {
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+    .suggestions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      justify-content: start;
+      background-color: #1f1f1f;
+      border: 1px solid #444;
+      border-radius: 10px;
+      margin: 5px 0;
+      padding: 10px;
+      width: 90%;
+      cursor: pointer;
+    }
+    .suggestion-item img {
+      margin-right: 10px;
+      width: 60px;
+    }
+    .saved-item {
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 10px auto;
+      background-color: #1a1a1a;
+      display: flex;
+      align-items: flex-start;
+      width: 90%;
+      max-width: 500px;
+    }
+    .saved-item img {
+      width: 100px;
+      margin-right: 15px;
+    }
+    .saved-details {
+      text-align: left;
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎬 Movie Tracking</h2>
+  <input type="text" id="filmAdi" placeholder="Enter the movie name..." oninput="filmOneriGetir(this.value)">
+  <div class="suggestions" id="filmOnerileri"></div>
+  <div class="movie" id="filmSonucu"></div>
+
+  <div id="onerilenKutusu" style="background:#1a1a1a; padding:15px; border-radius:10px; width:90%; max-width:400px; text-align:left; margin: 20px auto">
+    <h4>🎯 Günün Filmi</h4>
+    <div id="onerilenFilm"></div>
+  </div>
+
+  <div id="kayitliFilmler"></div>
+
+<script>
+const apiKey = "4edeb511";
+
+function filmOneriGetir(kelime) {
+  if (kelime.length < 3) {
+    document.getElementById("filmOnerileri").innerHTML = "";
+    return;
+  }
+  fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(kelime)}&apikey=${apiKey}`)
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById("filmOnerileri");
+      container.innerHTML = "";
+      if (data.Response === "True") {
+        const promises = data.Search.slice(0, 3).map(film =>
+          fetch(`https://www.omdbapi.com/?i=${film.imdbID}&apikey=${apiKey}`)
+            .then(res => res.json())
+        );
+        Promise.all(promises).then(films => {
+          films.forEach(film => {
+            const item = document.createElement("div");
+            item.className = "suggestion-item";
+            item.innerHTML = `
+              <img src="${film.Poster !== "N/A" ? film.Poster : "https://via.placeholder.com/100x150"}" alt="Poster">
+              <div style="text-align:left">
+                <strong>${film.Title}</strong><br>
+                IMDb: ${film.imdbRating}<br>
+                Genre: ${film.Genre.split(",")[0] || "Bilinmiyor"}
+              </div>
+            `;
+            item.onclick = () => {
+              document.getElementById("filmOnerileri").innerHTML = "";
+              filmDetayGoster(film);
+            };
+            container.appendChild(item);
+          });
+        });
+      }
+    });
+}
+
+function filmDetayGoster(data) {
+  const sonuc = document.getElementById("filmSonucu");
+  sonuc.innerHTML = `
+    <h3>${data.Title} (${data.Year})</h3>
+    <p><strong>IMDb:</strong> ${data.imdbRating}</p>
+    <p><strong>Genre:</strong> ${data.Genre}</p>
+    <img src="${data.Poster}" alt="Film Posteri">
+    <br><br>
+    <button onclick='filmKaydet(${JSON.stringify(data).replace(/'/g, "&apos;")})'>Save</button>
+  `;
+}
+
+function filmKaydet(data) {
+  let filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
+  const mevcut = filmler.find(f => f.imdbID === data.imdbID);
+  if (!mevcut) {
+    filmler.push({
+      title: data.Title,
+      year: data.Year,
+      genre: data.Genre,
+      poster: data.Poster,
+      imdbRating: data.imdbRating,
+      imdbID: data.imdbID,
+      watched: false
+    });
+    localStorage.setItem("kayitliFilmler", JSON.stringify(filmler));
+    kayitliFilmleriGoster();
+  }
+}
+
+function toggleWatched(imdbID) {
+  let filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
+  const index = filmler.findIndex(f => f.imdbID === imdbID);
+  if (index !== -1) {
+    filmler[index].watched = !filmler[index].watched;
+    localStorage.setItem("kayitliFilmler", JSON.stringify(filmler));
+    kayitliFilmleriGoster();
+  }
+}
+
+function deleteFilm(imdbID) {
+  let filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
+  filmler = filmler.filter(f => f.imdbID !== imdbID);
+  localStorage.setItem("kayitliFilmler", JSON.stringify(filmler));
+  kayitliFilmleriGoster();
+}
+
+function kayitliFilmleriGoster() {
+  const container = document.getElementById("kayitliFilmler");
+  const filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
+  container.innerHTML = filmler.map(f => `
+    <div class="saved-item">
+      <img src="${f.poster}" alt="Poster">
+      <div class="saved-details">
+        <h4>${f.title} (${f.year})</h4>
+        <p><strong>IMDb:</strong> ${f.imdbRating}</p>
+        <p><strong>Genre:</strong> ${f.genre}</p>
+        <button onclick="toggleWatched('${f.imdbID}')">
+          ${f.watched ? '✅ Watched' : '❌ Unwatched'}
+        </button>
+        <button onclick="deleteFilm('${f.imdbID}')">🗑️ Delete</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function onerilenFilmGoster() {
+  const today = new Date().toISOString().split('T')[0];
+  const cacheKey = `dailyFilm-${today}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    document.getElementById("onerilenFilm").innerHTML = cached;
+    return;
+  }
+  fetch(`https://www.omdbapi.com/?s=top&apikey=${apiKey}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.Response === "True" && data.Search.length > 0) {
+        const film = data.Search[0];
+        fetch(`https://www.omdbapi.com/?i=${film.imdbID}&apikey=${apiKey}`)
+          .then(res => res.json())
+          .then(detail => {
+            const content = `
+              <div style="display:flex;align-items:center">
+                <img src="${detail.Poster}" width="60" style="margin-right:10px;border-radius:6px">
+                <div>
+                  <strong>${detail.Title}</strong><br>
+                  IMDb: ${detail.imdbRating}<br>
+                  <button onclick='filmDetayGoster(${JSON.stringify(detail).replace(/'/g, "&apos;")})'>View</button>
+                </div>
+              </div>
+            `;
+            document.getElementById("onerilenFilm").innerHTML = content;
+            localStorage.setItem(cacheKey, content);
+          });
+      }
+    });
+}
+
+window.onload = () => {
+  onerilenFilmGoster();
+  kayitliFilmleriGoster();
+};
+</script>
+</body>
+</html>
