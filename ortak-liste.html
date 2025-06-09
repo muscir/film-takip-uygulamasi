@@ -38,14 +38,24 @@
       border-radius: 5px;
       cursor: pointer;
     }
+    .link-box {
+      background-color: #222;
+      color: white;
+      border-radius: 6px;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    .link-box input {
+      width: 80%;
+    }
   </style>
 </head>
 <body>
   <h2>🎬 Ortak Film Listesi</h2>
 
-  <div>
+  <div id="kullaniciSecimi">
     <input type="text" id="username" placeholder="Kullanıcı adı gir">
-    <button onclick="listeBaslat()">Listeyi Aç</button>
+    <button onclick="kaydetVeBaslat()">Listeyi Aç</button>
   </div>
 
   <div id="listeEkrani" style="display:none;">
@@ -54,6 +64,12 @@
     <button onclick="filmEkle()">➕ Film Ekle</button>
 
     <ul id="filmListesi"></ul>
+
+    <div class="link-box">
+      <p>🔗 Liste bağlantısı:</p>
+      <input type="text" id="listeLinki" readonly>
+      <button onclick="kopyalaLink()">📋 Kopyala</button>
+    </div>
   </div>
 
   <script type="module">
@@ -64,14 +80,22 @@
     const db = getFirestore(app);
     let aktifKullanici = '';
 
-    window.listeBaslat = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const queryUser = urlParams.get('u');
-      aktifKullanici = queryUser || document.getElementById("username").value.trim();
+    window.kaydetVeBaslat = () => {
+      const username = document.getElementById("username").value.trim();
+      if (!username) return alert("Kullanıcı adı gir!");
+      localStorage.setItem("kullaniciAdi", username);
+      listeBaslat();
+    }
 
-      if (!aktifKullanici) return alert("Kullanıcı adı gir!");
+    window.listeBaslat = async () => {
+      aktifKullanici = localStorage.getItem("kullaniciAdi");
+      if (!aktifKullanici) return;
+
+      document.getElementById("kullaniciSecimi").style.display = "none";
       document.getElementById("listeEkrani").style.display = "block";
       document.getElementById("aktifKullanici").innerText = `🎯 ${aktifKullanici} listesindesin`;
+
+      document.getElementById("listeLinki").value = `${window.location.origin}${window.location.pathname}?u=${aktifKullanici}`;
 
       await listeOlustur(aktifKullanici);
 
@@ -103,10 +127,22 @@
       });
     }
 
-    // Sayfa açıldığında URL'den kullanıcı varsa otomatik başlat
+    window.kopyalaLink = () => {
+      const input = document.getElementById("listeLinki");
+      input.select();
+      input.setSelectionRange(0, 99999);
+      navigator.clipboard.writeText(input.value);
+      alert("Bağlantı kopyalandı!");
+    }
+
     window.onload = () => {
-      const u = new URLSearchParams(window.location.search).get("u");
-      if (u) listeBaslat();
+      const paramKullanici = new URLSearchParams(window.location.search).get("u");
+      if (paramKullanici) {
+        localStorage.setItem("kullaniciAdi", paramKullanici);
+      }
+      if (localStorage.getItem("kullaniciAdi")) {
+        listeBaslat();
+      }
     }
   </script>
 </body>
