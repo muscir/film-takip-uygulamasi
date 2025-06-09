@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Ortak Film Listesi</title>
+  <script type="module" src="./firebase-setup.js"></script>
+  <style>
+    body {
+      background: #121212;
+      color: white;
+      font-family: Arial;
+      padding: 20px;
+      text-align: center;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      background: #1f1f1f;
+      margin: 5px;
+      padding: 10px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .delete-btn {
+      background: red;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎬 Ortak Film Listesi</h2>
+
+  <div>
+    <input type="text" id="username" placeholder="Kullanıcı adı gir">
+    <button onclick="listeBaslat()">Listeyi Aç</button>
+  </div>
+
+  <div id="listeEkrani" style="display:none;">
+    <h3 id="aktifKullanici"></h3>
+    <input type="text" id="filmAdi" placeholder="Film adı">
+    <button onclick="filmEkle()">➕ Film Ekle</button>
+
+    <ul id="filmListesi"></ul>
+  </div>
+
+  <script type="module">
+    import { listeOlustur, filmeEkle, listeGetir } from './firebase-setup.js';
+    import { getFirestore, doc, updateDoc, arrayRemove } from "firebase/firestore";
+    import { app } from './firebase-setup.js';
+
+    const db = getFirestore(app);
+    let aktifKullanici = '';
+
+    window.listeBaslat = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryUser = urlParams.get('u');
+      aktifKullanici = queryUser || document.getElementById("username").value.trim();
+
+      if (!aktifKullanici) return alert("Kullanıcı adı gir!");
+      document.getElementById("listeEkrani").style.display = "block";
+      document.getElementById("aktifKullanici").innerText = `🎯 ${aktifKullanici} listesindesin`;
+
+      await listeOlustur(aktifKullanici);
+
+      listeGetir(aktifKullanici, (filmler) => {
+        const ul = document.getElementById("filmListesi");
+        ul.innerHTML = "";
+        filmler.forEach(f => {
+          const li = document.createElement("li");
+          li.innerHTML = `
+            <span>${f}</span>
+            <button class="delete-btn" onclick="silFilm('${f}')">Sil</button>
+          `;
+          ul.appendChild(li);
+        });
+      });
+    }
+
+    window.filmEkle = async () => {
+      const film = document.getElementById("filmAdi").value.trim();
+      if (!film) return;
+      await filmeEkle(aktifKullanici, film);
+      document.getElementById("filmAdi").value = "";
+    }
+
+    window.silFilm = async (film) => {
+      const ref = doc(db, "listeler", aktifKullanici);
+      await updateDoc(ref, {
+        filmler: arrayRemove(film)
+      });
+    }
+
+    // Sayfa açıldığında URL'den kullanıcı varsa otomatik başlat
+    window.onload = () => {
+      const u = new URLSearchParams(window.location.search).get("u");
+      if (u) listeBaslat();
+    }
+  </script>
+</body>
+</html>
