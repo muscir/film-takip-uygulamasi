@@ -1,4 +1,3 @@
-<!-- Film Takip Uygulaması - GÜNCELLENMİŞ -->
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -26,6 +25,11 @@
       color: #000;
       font-weight: bold;
       cursor: pointer;
+    }
+    .top-right {
+      position: absolute;
+      top: 10px;
+      right: 10px;
     }
     .movie {
       margin-top: 20px;
@@ -66,6 +70,17 @@
       align-items: flex-start;
       width: 90%;
       max-width: 500px;
+      position: relative;
+    }
+    .saved-item button.delete-movie {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: #f55;
+      cursor: pointer;
     }
     .saved-item img {
       width: 100px;
@@ -75,9 +90,36 @@
       text-align: left;
       flex: 1;
     }
+    .list-names {
+      margin-top: 10px;
+    }
+    .list-name-item {
+      padding: 8px 12px;
+      margin: 5px auto;
+      background-color: #2a2a2a;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 300px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+    }
+    .list-name-item button {
+      background: none;
+      border: none;
+      font-size: 18px;
+      margin-left: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
+  <div class="top-right">
+    <button onclick="yeniListeOlustur()">➕ Liste Oluştur</button>
+  </div>
+
   <h2>🎬 Movie Tracking</h2>
   <input type="text" id="filmAdi" placeholder="Enter the movie name..." oninput="filmOneriGetir(this.value)">
   <div class="suggestions" id="filmOnerileri"></div>
@@ -88,40 +130,132 @@
     <div id="onerilenFilm"></div>
   </div>
 
+  <div class="list-names" id="listeIsimleri"></div>
   <div id="kayitliFilmler"></div>
 
 <script>
 const apiKey = "4edeb511";
+let listeler = JSON.parse(localStorage.getItem("filmListeleri")) || {};
+
+function yeniListeOlustur() {
+  const ad = prompt("Liste ismi:");
+  if (!ad) return;
+  if (!listeler[ad]) {
+    listeler[ad] = [];
+    localStorage.setItem("filmListeleri", JSON.stringify(listeler));
+    alert("Liste oluşturuldu: " + ad);
+    listeIsimleriniGoster();
+  } else {
+    alert("Bu isimde bir liste zaten var.");
+  }
+}
+
+function listeIsimleriniGoster() {
+  const div = document.getElementById("listeIsimleri");
+  div.innerHTML = Object.keys(listeler).map(isim => 
+    `<div class="list-name-item" onclick="listeyiGoster('${isim}')">
+      <span>${isim}</span>
+      <button onclick="event.stopPropagation(); silListe('${isim}')">🗑️</button>
+    </div>`
+  ).join("");
+}
+
+function silListe(isim) {
+  if (!confirm(`'${isim}' listesini silmek istediğinize emin misiniz?`)) return;
+  delete listeler[isim];
+  localStorage.setItem("filmListeleri", JSON.stringify(listeler));
+  listeIsimleriniGoster();
+  document.getElementById("kayitliFilmler").innerHTML = "";
+}
+
+function listeyiGoster(listeAdi) {
+  const filmler = listeler[listeAdi] || [];
+  document.getElementById("kayitliFilmler").innerHTML = 
+    `<h3>${listeAdi}</h3>` +
+    filmler.map(f => 
+      `<div class="saved-item">
+        <img src="${f.poster}" alt="Poster">
+        <div class="saved-details">
+          <h4>${f.title} (${f.year})</h4>
+          <p><strong>IMDb:</strong> ${f.imdbRating}</p>
+          <p><strong>Genre:</strong> ${f.genre}</p>
+        </div>
+        <button class="delete-movie" onclick="silFilm('${listeAdi}','${f.imdbID}')">❌</button>
+      </div>`
+    ).join("") +
+    `<button onclick="filmSecVeEkle('${listeAdi}')">➕ Bu Listeye Film Ekle</button>`;
+}
+
+function silFilm(listeAdi, imdbID) {
+  listeler[listeAdi] = listeler[listeAdi].filter(f => f.imdbID !== imdbID);
+  localStorage.setItem("filmListeleri", JSON.stringify(listeler));
+  listeyiGoster(listeAdi);
+}
+
+function filmSecVeEkle(listeAdi) {
+  const imdbID = prompt("Film ID girin (IMDB ID):");
+  if (!imdbID) return;
+  const film = JSON.parse(localStorage.getItem("kayitliFilmler") || "[]").find(f => f.imdbID === imdbID);
+  if (!film) return alert("Film bulunamadı.");
+  if (listeler[listeAdi].some(f => f.imdbID === film.imdbID)) return alert("Bu film zaten listede var.");
+  listeler[listeAdi].push(film);
+  localStorage.setItem("filmListeleri", JSON.stringify(listeler));
+  listeyiGoster(listeAdi);
+}
+
+function kayitliFilmleriGoster() {
+  const container = document.getElementById("kayitliFilmler");
+  const filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
+  container.innerHTML = filmler.map(f => 
+    `<div class="saved-item">
+      <img src="${f.poster}" alt="Poster">
+      <div class="saved-details">
+        <h4>${f.title} (${f.year})</h4>
+        <p><strong>IMDb:</strong> ${f.imdbRating}</p>
+        <p><strong>Genre:</strong> ${f.genre}</p>
+        <button onclick="listeyeEkle('${f.imdbID}')">📋 Listeye Ekle</button>
+      </div>
+    </div>`
+  ).join("");
+}
+
+function listeyeEkle(imdbID) {
+  const film = JSON.parse(localStorage.getItem("kayitliFilmler") || "[]").find(f => f.imdbID === imdbID);
+  const isimler = Object.keys(listeler);
+  if (!isimler.length) return alert("Önce liste oluştur!");
+  const secim = prompt("Hangi listeye eklemek istersin?\n" + isimler.join("\n"));
+  if (!secim || !listeler[secim]) return;
+  if (listeler[secim].some(f => f.imdbID === imdbID)) return alert("Bu film zaten o listede var!");
+  listeler[secim].push(film);
+  localStorage.setItem("filmListeleri", JSON.stringify(listeler));
+  alert(`Eklendi → ${secim}`);
+  listeyiGoster(secim);
+}
 
 function filmOneriGetir(kelime) {
-  if (kelime.length < 3) {
-    document.getElementById("filmOnerileri").innerHTML = "";
-    return;
-  }
+  const container = document.getElementById("filmOnerileri");
+  container.innerHTML = "";
+  if (kelime.length < 3) return;
   fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(kelime)}&apikey=${apiKey}`)
     .then(res => res.json())
     .then(data => {
-      const container = document.getElementById("filmOnerileri");
-      container.innerHTML = "";
       if (data.Response === "True") {
         const promises = data.Search.slice(0, 3).map(film =>
-          fetch(`https://www.omdbapi.com/?i=${film.imdbID}&apikey=${apiKey}`)
-            .then(res => res.json())
+          fetch(`https://www.omdbapi.com/?i=${film.imdbID}&apikey=${apiKey}`).then(res => res.json())
         );
         Promise.all(promises).then(films => {
           films.forEach(film => {
             const item = document.createElement("div");
             item.className = "suggestion-item";
-            item.innerHTML = `
-              <img src="${film.Poster !== "N/A" ? film.Poster : "https://via.placeholder.com/100x150"}" alt="Poster">
-              <div style="text-align:left">
-                <strong>${film.Title}</strong><br>
-                IMDb: ${film.imdbRating}<br>
-                Genre: ${film.Genre.split(",")[0] || "Bilinmiyor"}
-              </div>
-            `;
+            item.innerHTML = 
+              `<img src="${film.Poster !== "N/A" ? film.Poster : "https://via.placeholder.com/100x150"}" alt="Poster">
+               <div style="text-align:left">
+                 <strong>${film.Title}</strong><br>
+                 IMDb: ${film.imdbRating}<br>
+                 Genre: ${film.Genre.split(",")[0] || "Bilinmiyor"}
+               </div>`;
             item.onclick = () => {
-              document.getElementById("filmOnerileri").innerHTML = "";
+              container.innerHTML = "";
               filmDetayGoster(film);
             };
             container.appendChild(item);
@@ -132,69 +266,29 @@ function filmOneriGetir(kelime) {
 }
 
 function filmDetayGoster(data) {
-  const sonuc = document.getElementById("filmSonucu");
-  sonuc.innerHTML = `
-    <h3>${data.Title} (${data.Year})</h3>
-    <p><strong>IMDb:</strong> ${data.imdbRating}</p>
-    <p><strong>Genre:</strong> ${data.Genre}</p>
-    <img src="${data.Poster}" alt="Film Posteri">
-    <br><br>
-    <button onclick='filmKaydet(${JSON.stringify(data).replace(/'/g, "&apos;")})'>Save</button>
-  `;
+  document.getElementById("filmSonucu").innerHTML = 
+    `<h3>${data.Title} (${data.Year})</h3>
+     <p><strong>IMDb:</strong> ${data.imdbRating}</p>
+     <p><strong>Genre:</strong> ${data.Genre}</p>
+     <img src="${data.Poster}" alt="Film Posteri">
+     <br><br>
+     <button onclick='filmKaydet(${JSON.stringify(data).replace(/'/g, "&apos;")})'>Save</button>`;
 }
 
 function filmKaydet(data) {
   let filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
-  const mevcut = filmler.find(f => f.imdbID === data.imdbID);
-  if (!mevcut) {
+  if (!filmler.find(f => f.imdbID === data.imdbID)) {
     filmler.push({
       title: data.Title,
       year: data.Year,
       genre: data.Genre,
       poster: data.Poster,
       imdbRating: data.imdbRating,
-      imdbID: data.imdbID,
-      watched: false
+      imdbID: data.imdbID
     });
     localStorage.setItem("kayitliFilmler", JSON.stringify(filmler));
     kayitliFilmleriGoster();
   }
-}
-
-function toggleWatched(imdbID) {
-  let filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
-  const index = filmler.findIndex(f => f.imdbID === imdbID);
-  if (index !== -1) {
-    filmler[index].watched = !filmler[index].watched;
-    localStorage.setItem("kayitliFilmler", JSON.stringify(filmler));
-    kayitliFilmleriGoster();
-  }
-}
-
-function deleteFilm(imdbID) {
-  let filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
-  filmler = filmler.filter(f => f.imdbID !== imdbID);
-  localStorage.setItem("kayitliFilmler", JSON.stringify(filmler));
-  kayitliFilmleriGoster();
-}
-
-function kayitliFilmleriGoster() {
-  const container = document.getElementById("kayitliFilmler");
-  const filmler = JSON.parse(localStorage.getItem("kayitliFilmler")) || [];
-  container.innerHTML = filmler.map(f => `
-    <div class="saved-item">
-      <img src="${f.poster}" alt="Poster">
-      <div class="saved-details">
-        <h4>${f.title} (${f.year})</h4>
-        <p><strong>IMDb:</strong> ${f.imdbRating}</p>
-        <p><strong>Genre:</strong> ${f.genre}</p>
-        <button onclick="toggleWatched('${f.imdbID}')">
-          ${f.watched ? '✅ Watched' : '❌ Unwatched'}
-        </button>
-        <button onclick="deleteFilm('${f.imdbID}')">🗑️ Delete</button>
-      </div>
-    </div>
-  `).join("");
 }
 
 function onerilenFilmGoster() {
@@ -208,21 +302,20 @@ function onerilenFilmGoster() {
   fetch(`https://www.omdbapi.com/?s=top&apikey=${apiKey}`)
     .then(res => res.json())
     .then(data => {
-      if (data.Response === "True" && data.Search.length > 0) {
+      if (data.Response === "True" && data.Search.length) {
         const film = data.Search[0];
         fetch(`https://www.omdbapi.com/?i=${film.imdbID}&apikey=${apiKey}`)
           .then(res => res.json())
           .then(detail => {
-            const content = `
-              <div style="display:flex;align-items:center">
-                <img src="${detail.Poster}" width="60" style="margin-right:10px;border-radius:6px">
-                <div>
-                  <strong>${detail.Title}</strong><br>
-                  IMDb: ${detail.imdbRating}<br>
-                  <button onclick='filmDetayGoster(${JSON.stringify(detail).replace(/'/g, "&apos;")})'>View</button>
-                </div>
-              </div>
-            `;
+            const content = 
+              `<div style="display:flex;align-items:center">
+                 <img src="${detail.Poster}" width="60" style="margin-right:10px;border-radius:6px">
+                 <div>
+                   <strong>${detail.Title}</strong><br>
+                   IMDb: ${detail.imdbRating}<br>
+                   <button onclick='filmDetayGoster(${JSON.stringify(detail).replace(/'/g, "&apos;")})'>View</button>
+                 </div>
+               </div>`;
             document.getElementById("onerilenFilm").innerHTML = content;
             localStorage.setItem(cacheKey, content);
           });
@@ -233,6 +326,7 @@ function onerilenFilmGoster() {
 window.onload = () => {
   onerilenFilmGoster();
   kayitliFilmleriGoster();
+  listeIsimleriniGoster();
 };
 </script>
 </body>
